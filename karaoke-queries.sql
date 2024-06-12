@@ -50,15 +50,18 @@ FOREIGN KEY (telefono_cliente) REFERENCES Cliente(telefono) ON DELETE CASCADE;
 
 
 
--- ----------------------------------------------------------------------------------
+-- ****************************************************************************************************************
 -- CONSULTAS SQL
--- ---------------------------------------------------------------------------
+-- ****************************************************************************************************************
 
 -- LISTA Y ORDENA TODOS LOS EMPREADOS QUE HAN TRABAJADO EN UN DIA ESPECÍFICO
 select e.* from Empleado e inner join Horario h
 on e.id_emp =h.id_emp
 where h.dia ='2021-08-22'
 order by CAST(SUBSTRING(e.id_emp ,5)as UNSIGNED);
+
+
+
 
 
 -- LISTA TODAS LAS RESERVAS DE LAS SALAS ENTRE DOS FECHAS ESPECIFICAS
@@ -87,12 +90,14 @@ ORDER BY
     r.fec_reserva;
   
    
+   
+   
+   
 -- LISTA EL TOTAL DE SALAS QUE HA RESERVADO CADA CLIENTE DESDE QUE INICIO LA EMPRESA
 SELECT
 	c.telefono,
 	CONCAT(c.nombre, ' ', c.apellido) AS nombre_completo,
-	(
-	SELECT
+	(SELECT
 		COUNT(*)
 	FROM
 		Reserva r
@@ -106,6 +111,9 @@ FROM
 	Cliente c
 ORDER BY
 	total_reservas DESC;
+
+
+
 
 
 -- LISTA Y ORDENA EL TOTAL DE HORAS TRABAJADAS POR UN EMPLEADO EN UN DETERMINADO MES
@@ -125,35 +133,42 @@ WHERE
 GROUP BY
 	e.id_emp
 order by
-	CAST(SUBSTRING(e.id_emp , 5)as UNSIGNED)
-;
+	CAST(SUBSTRING(e.id_emp , 5)as UNSIGNED);
 
 
--- LISTA EL TOTAL DE GANANCIAS DE LAS SALAS PEQUEÑAS, MEDIANAS Y GRANDES POR SEPARADO
+
+
+   
+-- LISTA Y ORDENA EL TOTAL DE GANANCIAS DE CADA DIA DE LAS SALAS PEQUEÑAS, MEDIANAS Y GRANDES POR SEPARADO
+-- DENTRO DE UN MES DETERMINADO
 SELECT
-	CONCAT( SUM(IF(s.tamanio = 'pequeño', s.precio , 0)),' €' ) AS 'Total Pequeño',
-	CONCAT( SUM(IF(s.tamanio = 'mediano', s.precio , 0)),' €' ) AS 'Total Mediano',
-	CONCAT( SUM(IF(s.tamanio = 'grande', s.precio , 0)),' €' ) AS 'Total Grande'
+    DAY(r.fec_reserva) AS 'Día',
+    SUM(IF(s.tamanio = 'pequeño', s.precio , 0)) AS 'Total Pequeño',
+    SUM(IF(s.tamanio = 'mediano', s.precio , 0)) AS 'Total Mediano',
+    SUM(IF(s.tamanio = 'grande', s.precio , 0)) AS 'Total Grande'
 FROM
-	Reserva r
+    Reserva r
 INNER JOIN 
     Sala s 
 ON
-	r.num_sala = s.num_sala
+    r.num_sala = s.num_sala
 WHERE
-	MONTH(r.fec_reserva) = 8;
+    MONTH(r.fec_reserva) = 10 	-- 8,9 o 10
+GROUP BY 
+    DAY(r.fec_reserva)
+ORDER BY 
+	DAY(r.fec_reserva);
 
-   
-   
--- ---------------------------------------------------------------------------
+
+
+
+
+-- ****************************************************************************************************************
 -- VISTAS SQL
--- ---------------------------------------------------------------------------
-
-DROP VIEW IF EXISTS Clientes_Con_Reservas;
-DROP VIEW IF EXISTS Horas_Trabajadas_Empleado;
-   
+-- ****************************************************************************************************************
    
 -- VISTA PARA CLIENTES Y EL NUMERO DE RESERVAS QUE HA REALIZADO CADA UNO
+DROP VIEW IF EXISTS Clientes_Con_Reservas;
 CREATE VIEW Clientes_Con_Reservas AS
 SELECT DISTINCT
     CONCAT(c.nombre, ' ', c.apellido) AS nombre_completo,
@@ -170,8 +185,8 @@ SELECT * FROM Clientes_Con_Reservas;
    
 
 -- VISTA PARA EL TOTAL DE HORAS TRABAJADAS POR EMPLEADO EN UN MES ESPECÍFICO
+DROP VIEW IF EXISTS Horas_Trabajadas_Empleado;
 CREATE VIEW Horas_Trabajadas_Empleado AS
-
 SELECT 
     e.id_emp,
     CONCAT(e.nombre, ' ', e.apellido) AS nombre_completo,
@@ -182,15 +197,19 @@ FROM
 WHERE 
     MONTH(h.dia) = 8 -- OPCIONES: 8, 9, 10
 GROUP BY 
-    e.id_emp;
+    e.id_emp
+ORDER BY 
+	total_reservas;
    
 SELECT * FROM Horas_Trabajadas_Empleado;
 
 
 
--- ---------------------------------------------------------------------------
+
+
+-- ****************************************************************************************************************
 -- FUNCIONES
--- ---------------------------------------------------------------------------
+-- ****************************************************************************************************************
 
 -- FUNCION PARA GENERAR UN CODIGO DE RESERVA UNICO
 DELIMITER $$
@@ -203,38 +222,36 @@ BEGIN
     DECLARE primeros_tres_digitos VARCHAR(3);
     DECLARE ultimos_tres_digitos VARCHAR(3);
     
-    -- Obtiene el año, mes y día de fec_reserva
     SET anio_mes_dia = DATE_FORMAT(fecha_reserva, '%Y%m%d');
     
-    -- Extraer los primeros tres dígitos del número de teléfono
     SET primeros_tres_digitos = LEFT(telefono_cliente, 3);
     
-    -- Extrae los últimos tres dígitos del número de teléfono
     SET ultimos_tres_digitos = RIGHT(telefono_cliente, 3);
     
-    -- Genera el código 
     SET codigo_reserva = CONCAT('RES', anio_mes_dia, primeros_tres_digitos, ultimos_tres_digitos, 'S', num_sala);
     
     RETURN codigo_reserva;
 END $$
 DELIMITER ;
 
--- SELECT GenerarCodigoReserva('2024-6-8', '111222333', 1);
+SELECT GenerarCodigoReserva('2024-6-8', '111222333', 1);
 
--- Insertar un nuevo registro en la tabla de Reserva utilizando la función GenerarCodigoReserva
-
+-- Inserto un nuevo registro en la tabla de Reserva utilizando la función GenerarCodigoReserva
 INSERT INTO Reserva (id_reserva, fec_reserva, hora_ini, hora_fin, telefono_cliente, num_sala)
 VALUES (
-    GenerarCodigoReserva('2021-6-9', '799 815 243', 1), -- FUNCION PARA GENERAR EL CODIGO DE LA RESERVA
-    '2024-6-9',
-    '21:00',
-    '22:00',
+    GenerarCodigoReserva('2021-6-8', '799 815 243', 1), -- Funcion
+    '2021-6-8',
+    '9:30',
+    '10:30',
     '799 815 243',
     1
 );
+-- DELETE from Reserva WHERE id_reserva='RES20210608799243S1';
+-- select * from Reserva r ;
+-- SELECT * FROM Cliente c ;
 
-select * from Reserva r ;
-SELECT * FROM Cliente c ;
+
+
 
 
 -- FUNCION PARA MOSTRAR CUAL ES LA SALA MAS CONCURRIDA O FAVORITA POR LOS CLIENTES
@@ -274,10 +291,9 @@ SELECT ObtenerInfoSalaMasConcurrida() AS Info_Sala_Mas_Concurrida;
 
 
 
--- ---------------------------------------------------------------------------
+-- ****************************************************************************************************************
 -- PROCEDIMIENTOS ALMANCENADOS
--- ---------------------------------------------------------------------------
-
+-- ****************************************************************************************************************
 
 -- ESTE PROCEDIMIENTO PERMITE ACTUALIZAR EL TURNO DE UN EMPLEADO
 -- DE mañana A tarde Y VICEVERSA
@@ -312,9 +328,9 @@ BEGIN
 END &&
 DELIMITER ;
 
-CALL ActualizarTurnoEmpleado('EMP-10');
+-- CALL ActualizarTurnoEmpleado('EMP-10');
 
-select * from Empleado e where id_emp ='EMP-10';
+-- select * from Empleado e where id_emp ='EMP-10';
 
 
 
@@ -344,9 +360,10 @@ BEGIN
 END $$
 DELIMITER ;
 
+CALL InsertarNuevaReserva('2021-6-8', '9:30', '10:30', '799 815 243', 1);
+select * from Reserva r  where  r.telefono_cliente ='799 815 243';
 
-CALL InsertarNuevaReserva('2024-06-09', '21:00', '22:00', '605 645 737', 4);
--- select * from Reserva r  where  r.telefono_cliente ='605 645 737';
+
 
 
 
@@ -412,9 +429,9 @@ CALL GenerarInformeTurnoEmpleados();
 
 
 
--- ---------------------------------------------------------------------------
+-- ****************************************************************************************************************
 -- TRIGGERS
--- ---------------------------------------------------------------------------
+-- ****************************************************************************************************************
 
 -- TRIGGER QUE ASEGURA QUE EL ID DEL EMPLEADO SE CREE CORRECTAMENTE AL INSERTAR UN NUEVO EMPLEADO
 
@@ -438,25 +455,6 @@ INSERT INTO Empleado (id_emp, nombre, apellido, fec_nac, email, tlf, tipo_emp, t
 VALUES ('EMP-009', 'Maria', 'Gomez', '1985-05-15', 'maria.gomez@example.com', '9876543210', 'Asistente', 'Nocturno', 'F');
 
 
--- Registrar la fecha de insercion de un nuevo empleado
-
-DELIMITER &&
-CREATE TRIGGER registro_fecha_insercion AFTER INSERT ON Empleado
-FOR EACH ROW
-BEGIN
-    INSERT INTO Registro_Inserciones (id_emp, fecha_insercion) 
-    VALUES (NEW.id_emp, CURRENT_TIMESTAMP);
-END &&
-DELIMITER ;
-    
--- Insertamos un nuevo empleado
-INSERT INTO Empleado (id_emp, nombre, apellido, fec_nac, email, tlf, tipo_emp, turno, genero) 
-VALUES ('EMP-010', 'Pedro', 'Rodriguez', '1987-08-20', 'pedro.rodriguez@example.com', '5555555555', 'Cajero', 'Diurno', 'M');
-
--- Verificamos el registro de fecha de inserción
-SELECT * FROM Registro_Inserciones WHERE id_emp = 'EMP-010';
-
-
 
 
 
@@ -474,9 +472,6 @@ CREATE TABLE CLIENTES_INSATISFECHOS (
     puntuacion INT NOT NULL,
     comentario VARCHAR(250) NOT NULL
 );
-
-select * from CLIENTES_INSATISFECHOS;
-
 
 
 DROP TRIGGER IF EXISTS registrarClienteInsatisfecho;
@@ -501,17 +496,9 @@ INSERT INTO ValoracionCritica (id_val,fec_val,puntuacion,comentario,telefono_cli
 VALUES (2000,'2021-10-11',1,'No me gusto nada','795 305 972');
 
 select *FROM ValoracionCritica vc ;
+select * from CLIENTES_INSATISFECHOS;
 
 DELETE  from ValoracionCritica where id_val=2000;
-
-
-
-
-
-
-
-
-
 
 
 
